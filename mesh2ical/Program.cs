@@ -43,6 +43,8 @@ namespace Mesh2Ical
                 .Build();
 
             var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
+            loggerFactory.AddMemory(LogLevel.Trace);
+
             var logger = loggerFactory.CreateLogger(nameof(Program));
             logger.LogInformation("Started. Press Ctrl+C to break.");
 
