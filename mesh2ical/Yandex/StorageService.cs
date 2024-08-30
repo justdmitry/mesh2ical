@@ -36,7 +36,7 @@ namespace Mesh2Ical.Yandex
 
             await awsClient.PutObjectAsync(req).ConfigureAwait(false);
 
-            logger.LogInformation("Uploaded {Count} bytes to {FileName}", byteCount, fileName);
+            logger.LogDebug("Uploaded {Count} bytes to {FileName}", byteCount, fileName);
         }
     }
 }

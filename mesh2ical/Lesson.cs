@@ -1,6 +1,6 @@
 ﻿namespace Mesh2Ical
 {
-    public class SchoolEvent
+    public class Lesson
     {
         public long Id { get; set; }
 

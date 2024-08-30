@@ -3,23 +3,25 @@ using RecurrentTasks;
 
 namespace Mesh2Ical
 {
-    public class ExportTask(Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
+    public class ExportTask(ILogger<ExportTask> logger, Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
     {
         public static readonly TimeSpan Interval = TimeSpan.FromHours(4);
 
         public async Task RunAsync(ITask currentTask, IServiceProvider scopeServiceProvider, CancellationToken cancellationToken)
         {
-            await foreach(var (name, list) in meshService.Export())
+            await foreach(var cls in meshService.Export())
             {
-                using var ms = GenerateIcal(name, list);
+                using var ms = GenerateIcal(cls);
 
-                var fileName = $"class{name}.ics";
+                var fileName = $"class{cls.ClassUnitId}.ics";
 
                 await storageService.Upload(fileName.ToLowerInvariant(), ms);
+
+                logger.LogInformation("Saved lessons of {Class} into {File}", cls.ClassName, fileName);
             }
         }
 
-        protected MemoryStream GenerateIcal(string name, List<SchoolEvent> list)
+        protected MemoryStream GenerateIcal(ClassInfo cls)
         {
             var ms = new MemoryStream();
             using var writer = new StreamWriter(ms, leaveOpen: true);
@@ -29,10 +31,10 @@ namespace Mesh2Ical
             writer.WriteLine("PRODID:" + typeof(ExportTask).Assembly.FullName);
             writer.WriteLine("VERSION:2.0");
 
-            WriteString(writer, "X-WR-CALNAME", $"Уроки {name}");
-            WriteString(writer, "X-WR-CALDESC", $"Класс {name}");
+            WriteString(writer, "X-WR-CALNAME", $"Уроки {cls.ClassName}");
+            WriteString(writer, "X-WR-CALDESC", $"МЭШ {cls.ClassName} / {cls.SchoolNameShort}");
 
-            foreach (var item in list)
+            foreach (var item in cls.Lessons)
             {
                 writer.WriteLine("BEGIN:VEVENT");
 

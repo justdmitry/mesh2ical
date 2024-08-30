@@ -30,8 +30,6 @@ namespace Mesh2Ical
                 {
                     services.AddTelegramExceptionSender(context.Configuration.GetSection("ExceptionSender"));
 
-                    services.Configure<MeshOptions>(context.Configuration.GetSection(nameof(MeshOptions)));
-
                     services.AddHttpClient<MeshExportService>(c => c.Timeout = TimeSpan.FromSeconds(300))
                         .AddPolicyHandler(Policy.WrapAsync(
                             HttpPolicyExtensions.HandleTransientHttpError().Or<Polly.Timeout.TimeoutRejectedException>().WaitAndRetryAsync(5, x => TimeSpan.FromSeconds(x * 15)),
