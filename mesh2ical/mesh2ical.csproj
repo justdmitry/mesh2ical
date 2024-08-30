@@ -17,4 +17,10 @@
     <PackageReference Include="RecurrentTasks" Version="7.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="appsettings.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
