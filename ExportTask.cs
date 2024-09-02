@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Text;
+using Microsoft.Extensions.Logging;
 using RecurrentTasks;
 
 namespace Mesh2Ical
@@ -6,6 +7,26 @@ namespace Mesh2Ical
     public class ExportTask(ILogger<ExportTask> logger, Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
     {
         public static readonly TimeSpan Interval = TimeSpan.FromHours(4);
+
+        public static readonly List<(string Text, string Emoji)> SubjectEmojis =
+            [
+                ("РАЗГОВОРЫ О ГЛАВНОМ", Emoji.Loudspeaker),
+                ("МАТЕМАТИКА", Emoji.TriangularRuler),
+                ("ЛИТЕРАТУР", Emoji.OpenBook),
+                ("РУССКИЙ ЯЗЫК", Emoji.WritingHand),
+                ("ОКРУЖАЮЩИЙ", Emoji.Sunflower),
+                ("ИЗОБРАЗИТЕЛЬНОЕ", Emoji.ArtistPalette),
+                ("МУЗЫКА", Emoji.MusicalNotes),
+                ("АНГЛИЙСК", Emoji.Flag_UnitedKingdom),
+                ("ФИЗИЧЕСКАЯ", Emoji.SoccerBall),
+                ("ТЕХНОЛОГИЯ", Emoji.HammerAndWrench),
+                ("КОМПЛЕКСНЫЙ АНАЛИЗ ТЕКСТА", Emoji.PageWithCurl),
+                ("ЛИНГВИСТИЧЕСКИЙ", Emoji.SpeechBalloon),
+                ("ОСНОВЫ ДУХОВНО", Emoji.Scroll),
+                ("БИОЛОГИЯ", Emoji.Seedling),
+                ("ГЕОГРАФИЯ", Emoji.GlobeShowingEuropeAfrica),
+                ("ИСТОРИЯ", Emoji.Amphora),
+            ];
 
         public async Task RunAsync(ITask currentTask, IServiceProvider scopeServiceProvider, CancellationToken cancellationToken)
         {
@@ -43,6 +64,9 @@ namespace Mesh2Ical
 
                 WriteDateTime(writer, "DTSTART", item.Start);
                 WriteString(writer, "DURATION", $"PT{(int)item.End.Subtract(item.Start).TotalMinutes}M");
+
+                var emoji = SubjectEmojis.Find(x => item.Name.Contains(x.Text, StringComparison.OrdinalIgnoreCase)).Emoji;
+                item.Name = emoji + item.Name;
 
                 WriteString(writer, "SUMMARY", item.Name);
 
