@@ -11,7 +11,7 @@ namespace Mesh2Ical
 
         public static readonly List<(string Text, string Emoji)> SubjectEmojis =
             [
-                ("РАЗГОВОРЫ О ГЛАВНОМ", Emoji.Loudspeaker),
+                ("РАЗГОВОРЫ О ВАЖНОМ", Emoji.Loudspeaker),
                 ("МАТЕМАТИКА", Emoji.TriangularRuler),
                 ("ЛИТЕРАТУР", Emoji.OpenBook),
                 ("РУССКИЙ ЯЗЫК", Emoji.WritingHand),
