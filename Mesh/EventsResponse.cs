@@ -10,8 +10,8 @@
             {  "PLAN",  "ОО" },
         };
 
-        public Response[] response { get; set; } = [];
-        public Dictionary<string, ErrorDetail[]> errors { get; set; } = [];
+        public Response[]? response { get; set; }
+        public Dictionary<string, ErrorDetail[]>? errors { get; set; }
         public int total_count { get; set; }
     }
 

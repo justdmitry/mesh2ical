@@ -23,7 +23,7 @@ namespace Mesh2Ical.Mesh
             foreach (var child in family.children.Where(x => !string.IsNullOrEmpty(x.contingent_guid)))
             {
                 var events = await GetEvents(child.contingent_guid!, token);
-                var list = events.response
+                var list = events.response?
                     .Select(x => new Lesson()
                     {
                         Id = x.id,
@@ -40,7 +40,7 @@ namespace Mesh2Ical.Mesh
                     ClassUnitId = child.class_unit_id,
                     ClassLevel = child.class_level_id,
                     ClassName  = child.class_name ?? child.class_level_id.ToString(),
-                    Lessons = list,
+                    Lessons = list ?? [],
                 };
 
                 yield return cls;
@@ -99,9 +99,12 @@ namespace Mesh2Ical.Mesh
 
             var obj = (await resp.Content.ReadFromJsonAsync<EventsResponse>())!;
 
-            foreach(var err in obj.errors.SelectMany(x => x.Value.Select(v => v.error_description)))
+            if (obj.errors != null)
             {
-                logger.LogWarning("Error: {Text}", err);
+                foreach (var err in obj.errors.SelectMany(x => x.Value.Select(v => v.error_description)))
+                {
+                    logger.LogWarning("Error: {Text}", err);
+                }
             }
 
             return obj;
