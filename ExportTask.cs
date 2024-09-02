@@ -17,7 +17,7 @@ namespace Mesh2Ical
 
                 await storageService.Upload(fileName.ToLowerInvariant(), ms);
 
-                logger.LogInformation("Saved lessons of {Class} into {File}", cls.ClassName, fileName);
+                logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
             }
         }
 
