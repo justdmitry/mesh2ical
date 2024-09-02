@@ -74,11 +74,10 @@ namespace Mesh2Ical
 
                 WriteString(writer, "SUMMARY", item.Name);
 
-                if (item.Homework.Length > 0)
-                {
-                    var homework = "Домашнее задание:" + Environment.NewLine + string.Join(Environment.NewLine, item.Homework);
-                    WriteString(writer, "DESCRIPTION", homework);
-                }
+                var homework = item.Homework.Length == 0
+                    ? Emoji.House + "Домашнее задание: нет"
+                    : Emoji.House + "Домашнее задание:" + Environment.NewLine + string.Join(Environment.NewLine, item.Homework);
+                WriteString(writer, "DESCRIPTION", homework);
 
                 WriteString(writer, "LOCATION", item.Location);
 
