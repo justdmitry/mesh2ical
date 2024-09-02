@@ -31,6 +31,7 @@ namespace Mesh2Ical.Mesh
                         End = x.finish_at,
                         Name = x.subject_name,
                         Location = $"каб. {x.room_number}",
+                        Homework = x.homework?.descriptions ?? [],
                     })
                     .ToList();
                 var cls = new ClassInfo

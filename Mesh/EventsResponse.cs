@@ -102,7 +102,7 @@
         public int presence_status_id { get; set; }
         public int total_count { get; set; }
         public object? execute_count { get; set; }
-        public object?[] descriptions { get; set; }
+        public string[]? descriptions { get; set; }
         public object? link_types { get; set; }
         public object? materials { get; set; }
         public object? entries { get; set; }

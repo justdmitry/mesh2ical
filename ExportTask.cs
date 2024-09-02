@@ -7,6 +7,7 @@ namespace Mesh2Ical
     public class ExportTask(ILogger<ExportTask> logger, Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
     {
         public static readonly TimeSpan Interval = TimeSpan.FromHours(4);
+        public static readonly TimeSpan ShortInterval = TimeSpan.FromHours(1);
 
         public static readonly List<(string Text, string Emoji)> SubjectEmojis =
             [
@@ -40,6 +41,9 @@ namespace Mesh2Ical
 
                 logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
             }
+
+            var hour = DateTime.Now.Hour;
+            currentTask.Options.Interval = (hour >= 10 && hour < 17) ? ShortInterval : Interval;
         }
 
         protected MemoryStream GenerateIcal(ClassInfo cls)
@@ -69,6 +73,12 @@ namespace Mesh2Ical
                 item.Name = emoji + item.Name;
 
                 WriteString(writer, "SUMMARY", item.Name);
+
+                if (item.Homework.Length > 0)
+                {
+                    var homework = "Домашнее задание:" + Environment.NewLine + string.Join(Environment.NewLine, item.Homework);
+                    WriteString(writer, "DESCRIPTION", homework);
+                }
 
                 WriteString(writer, "LOCATION", item.Location);
 
