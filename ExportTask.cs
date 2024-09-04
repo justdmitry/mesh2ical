@@ -61,6 +61,10 @@ namespace Mesh2Ical
 
             foreach (var item in cls.Lessons)
             {
+                var emoji = SubjectEmojis.Find(x => item.Name.Contains(x.Text, StringComparison.OrdinalIgnoreCase)).Emoji;
+                var withHomework = item.Homework.Length > 0;
+                var homeworkSymbol = withHomework ? " " + char.ConvertFromUtf32(0x0365) : string.Empty;
+
                 writer.WriteLine("BEGIN:VEVENT");
 
                 WriteDateTime(writer, "DTSTAMP", DateTimeOffset.UtcNow);
@@ -69,15 +73,12 @@ namespace Mesh2Ical
                 WriteDateTime(writer, "DTSTART", item.Start);
                 WriteString(writer, "DURATION", $"PT{(int)item.End.Subtract(item.Start).TotalMinutes}M");
 
-                var emoji = SubjectEmojis.Find(x => item.Name.Contains(x.Text, StringComparison.OrdinalIgnoreCase)).Emoji;
-                item.Name = emoji + item.Name;
+                WriteString(writer, "SUMMARY", emoji + homeworkSymbol + item.Name);
 
-                WriteString(writer, "SUMMARY", item.Name);
-
-                var homework = item.Homework.Length == 0
-                    ? Emoji.House + "Домашнее задание: нет"
-                    : Emoji.House + "Домашнее задание:" + Environment.NewLine + string.Join(Environment.NewLine, item.Homework);
-                WriteString(writer, "DESCRIPTION", homework);
+                var homeworkText = withHomework
+                    ? Environment.NewLine + string.Join(Environment.NewLine, item.Homework)
+                    : "нет";
+                WriteString(writer, "DESCRIPTION", Emoji.House + "Домашнее задание: " + homeworkText);
 
                 WriteString(writer, "LOCATION", item.Location);
 
