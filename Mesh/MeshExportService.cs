@@ -12,6 +12,8 @@ namespace Mesh2Ical.Mesh
     {
         public const string TokenParamName = "MeshToken";
 
+        protected static readonly string[] KnownNoHomework = ["Не задано"];
+
         public async IAsyncEnumerable<ClassInfo> Export()
         {
             var token = await GetToken();
@@ -31,7 +33,11 @@ namespace Mesh2Ical.Mesh
                         End = x.finish_at,
                         Name = x.subject_name,
                         Location = $"каб. {x.room_number}",
-                        Homework = x.homework?.descriptions ?? [],
+                        Homework = x.homework?.descriptions?
+                            .Where(x => !string.IsNullOrWhiteSpace(x))
+                            .Where(x => !KnownNoHomework.Contains(x, StringComparer.OrdinalIgnoreCase))
+                            .ToArray()
+                            ?? [],
                     })
                     .ToList();
                 var cls = new ClassInfo
