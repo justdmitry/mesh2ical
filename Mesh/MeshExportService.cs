@@ -26,6 +26,7 @@ namespace Mesh2Ical.Mesh
             {
                 var events = await GetEvents(child.contingent_guid!, token);
                 var list = events.response?
+                    .Where(x => x.source == EventsResponse.SourcePlanEx || x.source == EventsResponse.SourceOutOfPlanEx)
                     .Select(x => new Lesson()
                     {
                         Id = x.id,

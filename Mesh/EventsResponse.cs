@@ -2,12 +2,16 @@
 {
     public class EventsResponse
     {
+        public const string SourcePlanEx = "PLAN";
+        public const string SourceOutOfPlanEx = "EC";
+        public const string SourceAdditionalEx = "AE";
+
         public static readonly Dictionary<string, string> Sources = new()
         {
-            {  "EC",  "Внеурочная деятельность" },
-            {  "AE",  "ДО" },
+            {  SourceOutOfPlanEx,  "Внеурочная деятельность" },
+            {  SourceAdditionalEx,  "ДО" },
             {  "ORGANIZER",  "Выездные мероприятия" },
-            {  "PLAN",  "ОО" },
+            {  SourcePlanEx,  "ОО" },
         };
 
         public Response[]? response { get; set; }
@@ -69,14 +73,14 @@
         public object? activities { get; set; }
         public object? link_to_join { get; set; }
         public object? control { get; set; }
-        public int[] class_unit_ids { get; set; } = [];
+        public int[]? class_unit_ids { get; set; } = [];
         public object? class_unit_name { get; set; }
-        public int group_id { get; set; }
+        public int? group_id { get; set; }
         public object? group_name { get; set; }
         public object? external_activities_type { get; set; }
         public object? address { get; set; }
         public object? place_comment { get; set; }
-        public int building_id { get; set; }
+        public int? building_id { get; set; }
         public string building_name { get; set; } = string.Empty;
         public object? city_building_name { get; set; }
         public object? cancelled { get; set; }
