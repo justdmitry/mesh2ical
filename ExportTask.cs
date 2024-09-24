@@ -31,19 +31,27 @@ namespace Mesh2Ical
 
         public async Task RunAsync(ITask currentTask, IServiceProvider scopeServiceProvider, CancellationToken cancellationToken)
         {
-            await foreach(var cls in meshService.Export())
-            {
-                using var ms = GenerateIcal(cls);
-
-                var fileName = $"class{cls.ClassUnitId}.ics";
-
-                await storageService.Upload(fileName.ToLowerInvariant(), ms);
-
-                logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
-            }
-
             var hour = DateTime.Now.Hour;
             currentTask.Options.Interval = (hour >= 10 && hour < 17) ? ShortInterval : Interval;
+
+            await foreach (var cls in meshService.Export())
+            {
+                if (cls.Lessons.Count == 0)
+                {
+                    logger.LogWarning("Found 0 lessons for {ClassName}, will re-run shortly", cls.ClassName);
+                    currentTask.Options.Interval = TimeSpan.FromMinutes(1);
+                }
+                else
+                {
+                    using var ms = GenerateIcal(cls);
+
+                    var fileName = $"class{cls.ClassUnitId}.ics";
+
+                    await storageService.Upload(fileName.ToLowerInvariant(), ms);
+
+                    logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
+                }
+            }
         }
 
         protected MemoryStream GenerateIcal(ClassInfo cls)
