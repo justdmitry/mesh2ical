@@ -5,6 +5,7 @@
         public const string SourcePlanEx = "PLAN";
         public const string SourceOutOfPlanEx = "EC";
         public const string SourceAdditionalEx = "AE";
+        public const string SourceOlympiad = "OLYMPIAD";
 
         public static readonly Dictionary<string, string> Sources = new()
         {
@@ -12,6 +13,7 @@
             {  SourceAdditionalEx,  "ДО" },
             {  "ORGANIZER",  "Выездные мероприятия" },
             {  SourcePlanEx,  "ОО" },
+            {  SourceOlympiad,  "Олимпиады" },
         };
 
         public Response[]? response { get; set; }
@@ -84,7 +86,7 @@
         public string building_name { get; set; } = string.Empty;
         public object? city_building_name { get; set; }
         public object? cancelled { get; set; }
-        public bool is_missed_lesson { get; set; }
+        public bool? is_missed_lesson { get; set; }
         public object? is_metagroup { get; set; }
         public object? absence_reason_id { get; set; }
         public object? nonattendance_reason_id { get; set; }
