@@ -6,8 +6,7 @@ namespace Mesh2Ical
 {
     public class ExportTask(ILogger<ExportTask> logger, Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
     {
-        public static readonly TimeSpan Interval = TimeSpan.FromHours(4);
-        public static readonly TimeSpan ShortInterval = TimeSpan.FromHours(1);
+        public static readonly TimeSpan Interval = TimeSpan.FromMinutes(42);
 
         public static readonly List<(string Text, string Emoji)> SubjectEmojis =
             [
@@ -29,10 +28,16 @@ namespace Mesh2Ical
                 ("ИСТОРИЯ", Emoji.Amphora),
             ];
 
+        private static readonly int[] NightHours = [22, 23, 0, 1, 2, 3, 4, 5, 6];
+
         public async Task RunAsync(ITask currentTask, IServiceProvider scopeServiceProvider, CancellationToken cancellationToken)
         {
             var hour = DateTime.Now.Hour;
-            currentTask.Options.Interval = (hour >= 10 && hour < 17) ? ShortInterval : Interval;
+
+            if (NightHours.Contains(hour))
+            {
+                return;
+            }
 
             await foreach (var cls in meshService.Export())
             {
@@ -54,7 +59,7 @@ namespace Mesh2Ical
             }
         }
 
-        protected MemoryStream GenerateIcal(ClassInfo cls)
+        protected static MemoryStream GenerateIcal(ClassInfo cls)
         {
             var ms = new MemoryStream();
             using var writer = new StreamWriter(ms, leaveOpen: true);
