@@ -12,7 +12,7 @@ namespace Mesh2Ical.Mesh
     {
         public const string TokenParamName = "MeshToken";
 
-        protected static readonly string[] KnownNoHomework = ["Не задано"];
+        protected static readonly string[] KnownNoHomework = ["Не задано", "Нет заданий", "Нет домашнего задания"];
 
         public async IAsyncEnumerable<ClassInfo> Export()
         {
