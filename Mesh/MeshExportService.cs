@@ -12,6 +12,10 @@ namespace SchoolHelper.Mesh
     {
         public const string TokenParamName = "MeshToken";
 
+        protected static readonly TimeSpan MaxTokenLifetime = TimeSpan.FromHours(8);
+
+        private static DateTimeOffset LastTokenRefresh = DateTimeOffset.MinValue;
+
         public async IAsyncEnumerable<ClassInfo> GetClasses(bool skipAdditionalSources)
         {
             var token = await GetToken();
@@ -41,11 +45,26 @@ namespace SchoolHelper.Mesh
                     SchoolNameFull = child.school?.name ?? "???",
                     ClassUnitId = child.class_unit_id,
                     ClassLevel = child.class_level_id,
-                    ClassName  = child.class_name ?? child.class_level_id.ToString(),
+                    ClassName = child.class_name ?? child.class_level_id.ToString(),
                     Lessons = list ?? [],
                 };
 
                 yield return cls;
+            }
+        }
+
+        public async IAsyncEnumerable<MealInfo> GetMeals(int contractId, DateOnly date)
+        {
+            var token = await GetToken();
+
+            var meals = await GetMeals(contractId, date, token);
+            foreach (var complex in meals.SelectMany(x => x.items).Where(x => x.complex != null).Select(x => x.complex))
+            {
+                yield return new MealInfo
+                {
+                    Name = complex.name,
+                    Content = string.Join(Environment.NewLine, complex.items.Select(x => x.name)),
+                };
             }
         }
 
@@ -56,6 +75,12 @@ namespace SchoolHelper.Mesh
             if (string.IsNullOrEmpty(oldToken))
             {
                 throw new InvalidOperationException("No token configured");
+            }
+
+            if (LastTokenRefresh.Add(MaxTokenLifetime) > DateTimeOffset.UtcNow)
+            {
+                logger.LogDebug("Token is fresh enough, no need to update.");
+                return oldToken;
             }
 
             var req = new HttpRequestMessage(HttpMethod.Get, "https://school.mos.ru/v2/token/refresh?roleId=2&subsystem=2");
@@ -71,6 +96,8 @@ namespace SchoolHelper.Mesh
             data[TokenParamName] = newToken;
             await File.WriteAllTextAsync(Program.AppsettingsOverridesFile, JsonSerializer.Serialize(data));
             logger.LogInformation("Token updated");
+
+            LastTokenRefresh = DateTimeOffset.UtcNow;
 
             return newToken;
         }
@@ -110,6 +137,18 @@ namespace SchoolHelper.Mesh
             }
 
             return obj;
+        }
+
+        protected async Task<List<MealsOrdersReaponseItem>> GetMeals(int contractId, DateOnly date, string token)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/meals/v2/orders?contractId={contractId}&from={date:yyyy-MM-dd}T00:00:01&to={date:yyyy-MM-dd}T23:59:00");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
+
+            var resp = await httpClient.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+
+            return (await resp.Content.ReadFromJsonAsync<List<MealsOrdersReaponseItem>>())!;
         }
     }
 }

@@ -39,8 +39,13 @@ namespace SchoolHelper
                     services.AddScoped<StorageService>();
 
                     services.Configure<CalendarOptions>(context.Configuration.GetSection(nameof(CalendarOptions)));
+                    services.Configure<MealOptions>(context.Configuration.GetSection(nameof(MealOptions)));
 
                     services.AddTask<CalendarTask>(o => o.AutoStart(CalendarTask.Interval, TimeSpan.FromSeconds(5)).WithExceptionSender());
+
+                    services.AddHttpClient<MealTask>()
+                         .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, x => TimeSpan.FromSeconds(x * 5)));
+                    services.AddTask<MealTask>(o => o.AutoStart(MealTask.Interval, TimeSpan.FromSeconds(10)).WithExceptionSender());
                 })
                 .Build();
 
