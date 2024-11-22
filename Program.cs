@@ -38,7 +38,9 @@ namespace SchoolHelper
                     services.Configure<StorageOptions>(context.Configuration.GetSection(nameof(StorageOptions)));
                     services.AddScoped<StorageService>();
 
-                    services.AddTask<ExportTask>(o => o.AutoStart(ExportTask.Interval, TimeSpan.FromSeconds(5)).WithExceptionSender());
+                    services.Configure<CalendarOptions>(context.Configuration.GetSection(nameof(CalendarOptions)));
+
+                    services.AddTask<CalendarTask>(o => o.AutoStart(CalendarTask.Interval, TimeSpan.FromSeconds(5)).WithExceptionSender());
                 })
                 .Build();
 

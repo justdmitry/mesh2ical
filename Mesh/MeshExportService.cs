@@ -12,9 +12,7 @@ namespace SchoolHelper.Mesh
     {
         public const string TokenParamName = "MeshToken";
 
-        protected static readonly string[] KnownNoHomework = ["Не задано", "Нет заданий", "Нет домашнего задания"];
-
-        public async IAsyncEnumerable<ClassInfo> Export()
+        public async IAsyncEnumerable<ClassInfo> GetClasses(bool skipAdditionalSources)
         {
             var token = await GetToken();
 
@@ -26,19 +24,15 @@ namespace SchoolHelper.Mesh
             {
                 var events = await GetEvents(child.contingent_guid!, token);
                 var list = events.response?
-                    .Where(x => x.source == EventsResponse.SourcePlanEx || x.source == EventsResponse.SourceOutOfPlanEx)
+                    .Where(x => !skipAdditionalSources || x.source == EventsResponse.SourcePlanEx || x.source == EventsResponse.SourceOutOfPlanEx)
                     .Select(x => new Lesson()
                     {
                         Id = x.id,
                         Start = x.start_at,
                         End = x.finish_at,
                         Name = x.subject_name,
-                        Location = $"каб. {x.room_number}",
-                        Homework = x.homework?.descriptions?
-                            .Where(x => !string.IsNullOrWhiteSpace(x))
-                            .Where(x => !KnownNoHomework.Contains(x, StringComparer.OrdinalIgnoreCase))
-                            .ToArray()
-                            ?? [],
+                        Location = x.room_number,
+                        Homework = x.homework?.descriptions,
                     })
                     .ToList();
                 var cls = new ClassInfo

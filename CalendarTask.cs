@@ -1,45 +1,32 @@
 ﻿using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RecurrentTasks;
 
 namespace SchoolHelper
 {
-    public class ExportTask(ILogger<ExportTask> logger, Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
+    public class CalendarTask(ILogger<CalendarTask> logger, IOptions<CalendarOptions> options, Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
     {
         public static readonly TimeSpan Interval = TimeSpan.FromMinutes(42);
 
-        public static readonly List<(string Text, string Emoji)> SubjectEmojis =
-            [
-                ("РАЗГОВОРЫ О ВАЖНОМ", Emoji.Loudspeaker),
-                ("МАТЕМАТИКА", Emoji.TriangularRuler),
-                ("ЛИТЕРАТУР", Emoji.OpenBook),
-                ("РУССКИЙ ЯЗЫК", Emoji.WritingHand),
-                ("ОКРУЖАЮЩИЙ", Emoji.Sunflower),
-                ("ИЗОБРАЗИТЕЛЬНОЕ", Emoji.ArtistPalette),
-                ("МУЗЫКА", Emoji.MusicalNotes),
-                ("АНГЛИЙСК", Emoji.Flag_UnitedKingdom),
-                ("ФИЗИЧЕСКАЯ", Emoji.SoccerBall),
-                ("ТЕХНОЛОГИЯ", Emoji.HammerAndWrench),
-                ("КОМПЛЕКСНЫЙ АНАЛИЗ ТЕКСТА", Emoji.PageWithCurl),
-                ("ЛИНГВИСТИЧЕСКИЙ", Emoji.SpeechBalloon),
-                ("ОСНОВЫ ДУХОВНО", Emoji.Scroll),
-                ("БИОЛОГИЯ", Emoji.Seedling),
-                ("ГЕОГРАФИЯ", Emoji.GlobeShowingEuropeAfrica),
-                ("ИСТОРИЯ", Emoji.Amphora),
-            ];
+        private static readonly string HomeworkMarker = " " + char.ConvertFromUtf32(0x0365);
+        private static readonly string HomeworkTitle = Emoji.House + "Домашнее задание: ";
+        private static readonly string NoHomeworkText = "нет";
 
-        private static readonly int[] NightHours = [22, 23, 0, 1, 2, 3, 4, 5, 6];
+        private readonly CalendarOptions options = options.Value;
 
         public async Task RunAsync(ITask currentTask, IServiceProvider scopeServiceProvider, CancellationToken cancellationToken)
         {
-            var hour = DateTime.Now.Hour;
+            // Reset to default. Will update later, if needed.
+            currentTask.Options.Interval = Interval;
 
-            if (NightHours.Contains(hour))
+            if (!options.Enabled)
             {
+                logger.LogDebug("Not enabled in options.");
                 return;
             }
 
-            await foreach (var cls in meshService.Export())
+            await foreach (var cls in meshService.GetClasses(options.SkipAdditionalSources))
             {
                 if (cls.Lessons.Count == 0)
                 {
@@ -59,14 +46,14 @@ namespace SchoolHelper
             }
         }
 
-        protected static MemoryStream GenerateIcal(ClassInfo cls)
+        protected MemoryStream GenerateIcal(ClassInfo cls)
         {
             var ms = new MemoryStream();
             using var writer = new StreamWriter(ms, leaveOpen: true);
 
             writer.WriteLine("BEGIN:VCALENDAR");
             writer.WriteLine("METHOD:PUBLISH");
-            writer.WriteLine("PRODID:" + typeof(ExportTask).Assembly.FullName);
+            writer.WriteLine("PRODID:" + typeof(CalendarTask).Assembly.FullName);
             writer.WriteLine("VERSION:2.0");
 
             WriteString(writer, "X-WR-CALNAME", $"Уроки {cls.ClassName}");
@@ -74,9 +61,12 @@ namespace SchoolHelper
 
             foreach (var item in cls.Lessons)
             {
-                var emoji = SubjectEmojis.Find(x => item.Name.Contains(x.Text, StringComparison.OrdinalIgnoreCase)).Emoji;
-                var withHomework = item.Homework.Length > 0;
-                var homeworkSymbol = withHomework ? " " + char.ConvertFromUtf32(0x0365) : string.Empty;
+                var emoji = options.ClassEmojis.FirstOrDefault(x => item.Name.Contains(x.Key, StringComparison.OrdinalIgnoreCase)).Value;
+                var homework = item.Homework?
+                    .Where(x => !string.IsNullOrWhiteSpace(x) && !options.IgnoreHomeworkStrings.Contains(x, StringComparer.CurrentCultureIgnoreCase))
+                    .ToList();
+                var withHomework = homework != null && homework.Count > 0;
+                var homeworkSymbol = withHomework ? HomeworkMarker : string.Empty;
 
                 writer.WriteLine("BEGIN:VEVENT");
 
@@ -89,11 +79,11 @@ namespace SchoolHelper
                 WriteString(writer, "SUMMARY", emoji + homeworkSymbol + item.Name);
 
                 var homeworkText = withHomework
-                    ? Environment.NewLine + string.Join(Environment.NewLine, item.Homework)
-                    : "нет";
-                WriteString(writer, "DESCRIPTION", Emoji.House + "Домашнее задание: " + homeworkText);
+                    ? Environment.NewLine + string.Join(Environment.NewLine, homework!)
+                    : NoHomeworkText;
+                WriteString(writer, "DESCRIPTION", HomeworkTitle + homeworkText);
 
-                WriteString(writer, "LOCATION", item.Location);
+                WriteString(writer, "LOCATION", "каб. " + item.Location);
 
                 writer.WriteLine("CLASS:PUBLIC");
                 writer.WriteLine("TRANSP:TRANSPARENT");
@@ -118,30 +108,30 @@ namespace SchoolHelper
                 return;
             }
 
-            value = value.Replace(",", @"\,").Replace(Environment.NewLine, @"\n");
+            var valueSpan = value.Replace(",", @"\,").Replace("\r", string.Empty).Replace("\n", @"\n").AsSpan();
 
             writer.Write(property);
             writer.Write(":");
-            if (value.Length <= MAX_LENGTH)
+            if (valueSpan.Length <= MAX_LENGTH)
             {
-                writer.WriteLine(value);
+                writer.WriteLine(valueSpan);
             }
             else
             {
-                for (var i = 0; i < value.Length; i += MAX_LENGTH)
+                for (var i = 0; i < valueSpan.Length; i += MAX_LENGTH)
                 {
                     if (i != 0)
                     {
                         writer.Write(" ");
                     }
 
-                    if (i + MAX_LENGTH > value.Length)
+                    if (i + MAX_LENGTH > valueSpan.Length)
                     {
-                        writer.WriteLine(value.Substring(i));
+                        writer.WriteLine(valueSpan[i..]);
                     }
                     else
                     {
-                        writer.WriteLine(value.Substring(i, MAX_LENGTH));
+                        writer.WriteLine(valueSpan.Slice(i, MAX_LENGTH));
                     }
                 }
             }

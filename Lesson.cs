@@ -12,6 +12,6 @@
 
         public string Location { get; set; } = string.Empty;
 
-        public string[] Homework { get; set; } = [];
+        public List<string>? Homework { get; set; }
     }
 }
