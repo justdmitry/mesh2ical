@@ -1,6 +1,6 @@
 ﻿using Logging.ExceptionSender;
-using Mesh2Ical.Mesh;
-using Mesh2Ical.Yandex;
+using SchoolHelper.Mesh;
+using SchoolHelper.Yandex;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Extensions.Http;
 
-namespace Mesh2Ical
+namespace SchoolHelper
 {
     public static class Program
     {

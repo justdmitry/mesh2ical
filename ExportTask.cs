@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using RecurrentTasks;
 
-namespace Mesh2Ical
+namespace SchoolHelper
 {
     public class ExportTask(ILogger<ExportTask> logger, Mesh.MeshExportService meshService, Yandex.StorageService storageService) : IRunnable
     {

@@ -4,7 +4,7 @@ using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Mesh2Ical.Yandex
+namespace SchoolHelper.Yandex
 {
     public class StorageService (ILogger<StorageService> logger, IOptionsSnapshot<StorageOptions> options)
     {

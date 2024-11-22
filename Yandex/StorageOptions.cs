@@ -1,4 +1,4 @@
-﻿namespace Mesh2Ical.Yandex
+﻿namespace SchoolHelper.Yandex
 {
     public class StorageOptions
     {

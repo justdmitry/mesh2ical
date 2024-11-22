@@ -1,4 +1,4 @@
-﻿namespace Mesh2Ical.Mesh
+﻿namespace SchoolHelper.Mesh
 {
     public class EventsResponse
     {

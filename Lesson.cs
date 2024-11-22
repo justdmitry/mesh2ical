@@ -1,4 +1,4 @@
-﻿namespace Mesh2Ical
+﻿namespace SchoolHelper
 {
     public class Lesson
     {
