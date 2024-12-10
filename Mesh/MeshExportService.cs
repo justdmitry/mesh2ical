@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -12,7 +13,7 @@ namespace SchoolHelper.Mesh
     {
         public const string TokenParamName = "MeshToken";
 
-        protected static readonly TimeSpan MaxTokenLifetime = TimeSpan.FromHours(8);
+        protected static readonly TimeSpan MaxTokenLifetime = TimeSpan.FromMinutes(20);
 
         private static DateTimeOffset LastTokenRefresh = DateTimeOffset.MinValue;
 
@@ -95,9 +96,16 @@ namespace SchoolHelper.Mesh
             var data = JsonSerializer.Deserialize<Dictionary<string, string>>(text) ?? [];
             data[TokenParamName] = newToken;
             await File.WriteAllTextAsync(Program.AppsettingsOverridesFile, JsonSerializer.Serialize(data));
-            logger.LogInformation("Token updated");
 
             LastTokenRefresh = DateTimeOffset.UtcNow;
+
+            var payloadBase64 = newToken.Split('.')[1];
+            var payloadText = payloadBase64.Replace('_', '/').Replace('-', '+').PadRight(4 * ((payloadBase64.Length + 3) / 4), '=');
+            var payloadJson = JsonNode.Parse(Convert.FromBase64String(payloadText));
+            var expires = payloadJson["exp"].GetValue<int>();
+            var expiresTime = DateTimeOffset.FromUnixTimeSeconds(expires);
+
+            logger.LogInformation("Token updated, expires {Expires}", expiresTime);
 
             return newToken;
         }
