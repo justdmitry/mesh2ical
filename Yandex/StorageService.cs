@@ -30,7 +30,7 @@ namespace SchoolHelper.Yandex
 
             req.Headers.ContentType = "text/calendar; charset=utf-8";
             req.Headers.CacheControl = "public, max-age=3600"; // 1 hour
-            req.Headers.ExpiresUtc = DateTime.UtcNow.AddHours(1);
+            req.Headers.Expires = DateTime.UtcNow.AddHours(1);
 
             var byteCount = data.Length;
 
