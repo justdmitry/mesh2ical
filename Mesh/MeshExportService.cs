@@ -12,10 +12,9 @@ namespace SchoolHelper.Mesh
     public class MeshExportService(ILogger<MeshExportService> logger, HttpClient httpClient, IConfiguration configuration)
     {
         public const string TokenParamName = "MeshToken";
+        public const string RefreshTokenParamName = "MeshRefreshToken";
 
         protected static readonly TimeSpan MaxTokenLifetime = TimeSpan.FromMinutes(20);
-
-        private static DateTimeOffset LastTokenRefresh = DateTimeOffset.MinValue;
 
         public async IAsyncEnumerable<ClassInfo> GetClasses(bool skipAdditionalSources)
         {
@@ -77,37 +76,37 @@ namespace SchoolHelper.Mesh
             {
                 throw new InvalidOperationException("No token configured");
             }
-
-            if (LastTokenRefresh.Add(MaxTokenLifetime) > DateTimeOffset.UtcNow)
+            else if (GetTokenExpiration(oldToken) > DateTimeOffset.UtcNow.AddDays(1))
             {
                 logger.LogDebug("Token is fresh enough, no need to update.");
                 return oldToken;
             }
 
-            var req = new HttpRequestMessage(HttpMethod.Get, "https://school.mos.ru/v2/token/refresh?roleId=2&subsystem=2");
-            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", oldToken);
+            var content = new Dictionary<string, string?>()
+            {
+                ["refresh_token"] = configuration[RefreshTokenParamName],
+            };
+
+            var req = new HttpRequestMessage(HttpMethod.Post, "https://school.mos.ru/v3/token/refresh");
+            req.Content = new FormUrlEncodedContent(content);
 
             var resp = await httpClient.SendAsync(req);
             resp.EnsureSuccessStatusCode();
 
-            var newToken = await resp.Content.ReadAsStringAsync();
+            var newToken = await resp.Content.ReadFromJsonAsync<TokenRefreshResponse>();
 
             var text = await File.ReadAllTextAsync(Program.AppsettingsOverridesFile);
             var data = JsonSerializer.Deserialize<Dictionary<string, string>>(text) ?? [];
-            data[TokenParamName] = newToken;
+            data[TokenParamName] = newToken.access_token;
+            data[RefreshTokenParamName] = newToken.refresh_token;
             await File.WriteAllTextAsync(Program.AppsettingsOverridesFile, JsonSerializer.Serialize(data));
 
-            LastTokenRefresh = DateTimeOffset.UtcNow;
+            logger.LogInformation(
+                "Token updated, expires {Expires}, refresh token expires {Expires2}",
+                GetTokenExpiration(newToken.access_token),
+                GetTokenExpiration(newToken.refresh_token));
 
-            var payloadBase64 = newToken.Split('.')[1];
-            var payloadText = payloadBase64.Replace('_', '/').Replace('-', '+').PadRight(4 * ((payloadBase64.Length + 3) / 4), '=');
-            var payloadJson = JsonNode.Parse(Convert.FromBase64String(payloadText));
-            var expires = payloadJson["exp"].GetValue<int>();
-            var expiresTime = DateTimeOffset.FromUnixTimeSeconds(expires);
-
-            logger.LogInformation("Token updated, expires {Expires}", expiresTime);
-
-            return newToken;
+            return newToken.access_token;
         }
 
         protected async Task<ProfileResponse> GetFamily(string token)
@@ -157,6 +156,15 @@ namespace SchoolHelper.Mesh
             resp.EnsureSuccessStatusCode();
 
             return (await resp.Content.ReadFromJsonAsync<List<MealsOrdersReaponseItem>>())!;
+        }
+
+        private static DateTimeOffset GetTokenExpiration(string token)
+        {
+            var payloadBase64 = token.Split('.')[1];
+            var payloadText = payloadBase64.Replace('_', '/').Replace('-', '+').PadRight(4 * ((payloadBase64.Length + 3) / 4), '=');
+            var payloadJson = JsonNode.Parse(Convert.FromBase64String(payloadText));
+            var expires = payloadJson["exp"].GetValue<int>();
+            return DateTimeOffset.FromUnixTimeSeconds(expires);
         }
     }
 }
