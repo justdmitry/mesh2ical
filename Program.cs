@@ -1,30 +1,21 @@
 ﻿using Logging.ExceptionSender;
-using SchoolHelper.Mesh;
-using SchoolHelper.Yandex;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Extensions.Http;
+using SchoolHelper.Mesh;
+using SchoolHelper.Yandex;
 
 namespace SchoolHelper
 {
     public static class Program
     {
-        public const string AppsettingsOverridesFile = "appsettings.Overrides.json";
-
         public static async Task Main(string[] args)
         {
-            if (!File.Exists(AppsettingsOverridesFile))
-            {
-                await File.WriteAllTextAsync(AppsettingsOverridesFile, "{}");
-            }
-
             var app = Host
                 .CreateDefaultBuilder(args)
                 .UseConsoleLifetime()
-                .ConfigureAppConfiguration(c => c.AddJsonFile(AppsettingsOverridesFile, false, true))
                 .ConfigureLogging(o => o.AddSystemdConsole())
                 .ConfigureServices((context, services) =>
                 {
@@ -34,6 +25,8 @@ namespace SchoolHelper
                         .AddPolicyHandler(Policy.WrapAsync(
                             HttpPolicyExtensions.HandleTransientHttpError().Or<Polly.Timeout.TimeoutRejectedException>().WaitAndRetryAsync(5, x => TimeSpan.FromSeconds(x * 15)),
                             Policy.TimeoutAsync<HttpResponseMessage>(15)));
+
+                    services.AddScoped<StateService>();
 
                     services.Configure<StorageOptions>(context.Configuration.GetSection(nameof(StorageOptions)));
                     services.AddScoped<StorageService>();
@@ -54,6 +47,10 @@ namespace SchoolHelper
 
             var logger = loggerFactory.CreateLogger(nameof(Program));
             logger.LogInformation("Started. Press Ctrl+C to break.");
+
+            // Create/update state file.
+            var stateService = app.Services.GetRequiredService<StateService>();
+            await stateService.Save(s => { });
 
             await app.RunAsync();
         }

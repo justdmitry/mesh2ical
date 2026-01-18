@@ -2,21 +2,29 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>SchoolHelper</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <EnableSdkContainerSupport>True</EnableSdkContainerSupport>
+    <EnableSdkContainerDebugging>True</EnableSdkContainerDebugging>
+    <ContainerFamily>alpine</ContainerFamily>
+    <ContainerRegistry>cr.yandex</ContainerRegistry>
+    <ContainerRepository>crpgl6ipphip8ig1herj/school-helper</ContainerRepository>
+  </PropertyGroup>
+  
   <ItemGroup>
-    <PackageReference Include="AWSSDK.S3" Version="4.0.6.10" />
-    <PackageReference Include="Logging.ExceptionSender" Version="4.5.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="9.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.8" />
-    <PackageReference Include="NetTelegramBotApi" Version="7.0.0" />
-    <PackageReference Include="RecurrentTasks" Version="7.0.1" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.17.2" />
+    <PackageReference Include="Logging.ExceptionSender" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.2" />
+    <PackageReference Include="NetTelegramBotApi" Version="7.1.0" />
+    <PackageReference Include="RecurrentTasks" Version="7.1.0" />
   </ItemGroup>
 
   <ItemGroup>

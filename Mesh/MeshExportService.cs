@@ -1,19 +1,14 @@
 ﻿using System.Globalization;
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 #pragma warning disable S1075 // URIs should not be hardcoded
 
 namespace SchoolHelper.Mesh
 {
-    public class MeshExportService(ILogger<MeshExportService> logger, HttpClient httpClient, IConfiguration configuration)
+    public class MeshExportService(ILogger<MeshExportService> logger, HttpClient httpClient, StateService stateService)
     {
-        public const string TokenParamName = "MeshToken";
-        public const string RefreshTokenParamName = "MeshRefreshToken";
-
         protected static readonly TimeSpan MaxTokenLifetime = TimeSpan.FromMinutes(20);
 
         public async IAsyncEnumerable<ClassInfo> GetClasses(bool skipAdditionalSources)
@@ -70,7 +65,9 @@ namespace SchoolHelper.Mesh
 
         protected async Task<string> GetToken()
         {
-            var oldToken = configuration[TokenParamName];
+            var state = await stateService.Load();
+
+            var oldToken = state.MeshToken;
 
             if (string.IsNullOrEmpty(oldToken))
             {
@@ -84,7 +81,7 @@ namespace SchoolHelper.Mesh
 
             var content = new Dictionary<string, string?>()
             {
-                ["refresh_token"] = configuration[RefreshTokenParamName],
+                ["refresh_token"] = state.MeshRefreshToken,
             };
 
             var req = new HttpRequestMessage(HttpMethod.Post, "https://school.mos.ru/v3/token/refresh");
@@ -95,11 +92,12 @@ namespace SchoolHelper.Mesh
 
             var newToken = await resp.Content.ReadFromJsonAsync<TokenRefreshResponse>();
 
-            var text = await File.ReadAllTextAsync(Program.AppsettingsOverridesFile);
-            var data = JsonSerializer.Deserialize<Dictionary<string, string>>(text) ?? [];
-            data[TokenParamName] = newToken.access_token;
-            data[RefreshTokenParamName] = newToken.refresh_token;
-            await File.WriteAllTextAsync(Program.AppsettingsOverridesFile, JsonSerializer.Serialize(data));
+            await stateService.Save(
+                s =>
+                {
+                    s.MeshToken = newToken.access_token;
+                    s.MeshRefreshToken = newToken.refresh_token;
+                });
 
             logger.LogInformation(
                 "Token updated, expires {Expires}, refresh token expires {Expires2}",

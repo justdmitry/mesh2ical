@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: school-helper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: school-helper
+  template:
+    metadata:
+      labels:
+        app: school-helper
+    spec:
+      volumes:
+      - name: log-storage
+        emptyDir: {}
+      - name: state-storage
+        hostPath:
+          path: /usr/k8s-volumes/school-helper
+          type: Directory
+      containers:
+      - name: school-helper
+        image: docker.io/some-value-here/school-helper:latest
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: log-storage
+          mountPath: /app/log
+        - name: state-storage
+          mountPath: /app/state
+        env:
+        #- name: Logging__LogLevel__Default
+        #  value: "Trace"
+        - name: StateFilePath
+          value: "/app/state/state.json"
+        - name: StorageOptions__BucketName
+          value: "put-some-name-here"
+        - name: StorageOptions__KeyId
+          value: "put-key-here"
+        - name: StorageOptions__KeySecret
+          value: "put-secret-here"
+        - name: MealOptions__Enabled
+          value: "False"
+        - name: MealOptions__BotToken
+          value: "put-token-here (when enabled)"
+        - name: MealOptions__ContractToChatMapping__123
+          value: "456"

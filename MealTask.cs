@@ -1,6 +1,4 @@
 ﻿using System.Globalization;
-using System.Text.Json;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NetTelegramBotApi;
@@ -8,10 +6,9 @@ using RecurrentTasks;
 
 namespace SchoolHelper
 {
-    public class MealTask(ILogger<CalendarTask> logger, IOptions<MealOptions> options, Mesh.MeshExportService meshService, HttpClient httpClient, IConfiguration configuration) : IRunnable
+    public class MealTask(ILogger<MealTask> logger, IOptions<MealOptions> options, Mesh.MeshExportService meshService, HttpClient httpClient, StateService stateService) : IRunnable
     {
         public static readonly TimeSpan Interval = TimeSpan.FromMinutes(42);
-        public static readonly CultureInfo culture = new("ru-RU");
 
         private readonly MealOptions options = options.Value;
 
@@ -49,13 +46,13 @@ namespace SchoolHelper
             }
 
             var bot = new TelegramBot(options.BotToken, httpClient);
-            var dateAsText = next.ToString("d", culture);
+            var dateAsText = next.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+
+            var state = await stateService.Load();
 
             foreach (var (contractId, chatId) in options.ContractToChatMapping)
             {
-                var keyName = $"LASTMEALREPORT_{contractId}";
-
-                var lastReport = configuration.GetValue<DateOnly>(keyName);
+                var lastReport = state.LastMealReports[contractId];
                 if (next == lastReport)
                 {
                     logger.LogDebug("Meal of {ContractId} for {Date:d} has already been reported", contractId, next);
@@ -79,10 +76,7 @@ namespace SchoolHelper
                     logger.LogDebug("No-meal of {ContractId} for {Date:d} reported to {ChatId}", contractId, next, chatId);
                 }
 
-                var text = await File.ReadAllTextAsync(Program.AppsettingsOverridesFile);
-                var data = JsonSerializer.Deserialize<Dictionary<string, string>>(text) ?? [];
-                data[keyName] = next.ToString(CultureInfo.InvariantCulture);
-                await File.WriteAllTextAsync(Program.AppsettingsOverridesFile, JsonSerializer.Serialize(data));
+                await stateService.Save(s => s.LastMealReports[contractId] = next);
             }
         }
     }
