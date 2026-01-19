@@ -32,6 +32,7 @@ namespace SchoolHelper.Mesh
                         Name = x.subject_name,
                         Location = x.room_number,
                         Homework = x.homework?.descriptions,
+                        Replaced = x.replaced,
                     })
                     .ToList();
                 var cls = new ClassInfo

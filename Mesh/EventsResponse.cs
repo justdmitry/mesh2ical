@@ -64,7 +64,7 @@
         public string subject_name { get; set; } = string.Empty;
         ////public string room_name { get; set; } = string.Empty;
         public string room_number { get; set; } = string.Empty;
-        ////public object? replaced { get; set; }
+        public bool replaced { get; set; }
         ////public object? replaced_teacher_id { get; set; }
         ////public object? esz_field_id { get; set; }
         ////public object? lesson_type { get; set; }

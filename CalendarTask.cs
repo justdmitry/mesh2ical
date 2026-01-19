@@ -12,6 +12,8 @@ namespace SchoolHelper
         private static readonly string HomeworkMarker = " " + char.ConvertFromUtf32(0x0365);
         private static readonly string HomeworkTitle = Emoji.House + "Домашнее задание: ";
         private static readonly string NoHomeworkText = "нет";
+        private static readonly string ReplacedMarker = char.ConvertFromUtf32(0x21C5);
+        private static readonly string ReplacedText = "Замена учителя.";
 
         private readonly CalendarOptions options = options.Value;
 
@@ -67,6 +69,7 @@ namespace SchoolHelper
                     .ToList();
                 var withHomework = homework != null && homework.Count > 0;
                 var homeworkSymbol = withHomework ? HomeworkMarker : string.Empty;
+                var replacedSymbol = item.Replaced ? ReplacedMarker : string.Empty;
 
                 writer.WriteLine("BEGIN:VEVENT");
 
@@ -76,12 +79,14 @@ namespace SchoolHelper
                 WriteDateTime(writer, "DTSTART", item.Start);
                 WriteString(writer, "DURATION", $"PT{(int)item.End.Subtract(item.Start).TotalMinutes}M");
 
-                WriteString(writer, "SUMMARY", emoji + homeworkSymbol + item.Name);
+                WriteString(writer, "SUMMARY", emoji + replacedSymbol + homeworkSymbol + item.Name);
 
+
+                var replacedText = item.Replaced ? (ReplacedMarker + " " + ReplacedText + Environment.NewLine) : string.Empty;
                 var homeworkText = withHomework
-                    ? Environment.NewLine + string.Join(Environment.NewLine, homework!)
-                    : NoHomeworkText;
-                WriteString(writer, "DESCRIPTION", HomeworkTitle + homeworkText);
+                    ? HomeworkTitle + Environment.NewLine + string.Join(Environment.NewLine, homework!)
+                    : HomeworkTitle + NoHomeworkText;
+                WriteString(writer, "DESCRIPTION", replacedText + homeworkText);
 
                 WriteString(writer, "LOCATION", "каб. " + item.Location);
 
