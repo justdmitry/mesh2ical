@@ -1,9 +1,8 @@
 ﻿using Logging.ExceptionSender;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Polly;
-using Polly.Extensions.Http;
 using SchoolHelper.Mesh;
 using SchoolHelper.Yandex;
 
@@ -19,12 +18,11 @@ namespace SchoolHelper
                 .ConfigureLogging(o => o.AddSystemdConsole())
                 .ConfigureServices((context, services) =>
                 {
-                    services.AddTelegramExceptionSender(context.Configuration.GetSection("ExceptionSender"));
+                    services.AddTelegramExceptionSender(context.Configuration.GetSection("ExceptionSender"), b => b.TryAddTelegramProxy(context.Configuration));
 
-                    services.AddHttpClient<MeshExportService>(c => c.Timeout = TimeSpan.FromSeconds(300))
-                        .AddPolicyHandler(Policy.WrapAsync(
-                            HttpPolicyExtensions.HandleTransientHttpError().Or<Polly.Timeout.TimeoutRejectedException>().WaitAndRetryAsync(5, x => TimeSpan.FromSeconds(x * 15)),
-                            Policy.TimeoutAsync<HttpResponseMessage>(15)));
+                    services
+                    .AddHttpClient<MeshExportService>(c => c.Timeout = TimeSpan.FromSeconds(300))
+                        .AddStandardResilienceHandler();
 
                     services.AddScoped<StateService>();
 
@@ -36,8 +34,9 @@ namespace SchoolHelper
 
                     services.AddTask<CalendarTask>(o => o.AutoStart(CalendarTask.Interval, TimeSpan.FromSeconds(5)).WithExceptionSender());
 
-                    services.AddHttpClient<MealTask>()
-                         .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, x => TimeSpan.FromSeconds(x * 5)));
+                    services
+                        .AddHttpClient<MealTask>()
+                        .AddStandardResilienceHandler();
                     services.AddTask<MealTask>(o => o.AutoStart(MealTask.Interval, TimeSpan.FromSeconds(10)).WithExceptionSender());
                 })
                 .Build();
@@ -53,6 +52,18 @@ namespace SchoolHelper
             await stateService.Save(s => { });
 
             await app.RunAsync();
+        }
+
+        private static IHttpClientBuilder TryAddTelegramProxy(this IHttpClientBuilder builder, IConfiguration configuration)
+        {
+            var tgProxy = configuration["TELEGRAM_API_PROXY"];
+
+            if (!string.IsNullOrWhiteSpace(tgProxy))
+            {
+                builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { Proxy = new System.Net.WebProxy(tgProxy) });
+            }
+
+            return builder;
         }
     }
 }
