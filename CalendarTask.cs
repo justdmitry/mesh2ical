@@ -15,6 +15,8 @@ namespace SchoolHelper
         private static readonly string ReplacedMarker = char.ConvertFromUtf32(0x21C5);
         private static readonly string ReplacedText = "Замена учителя.";
 
+        private static readonly Dictionary<int, DateTimeOffset> LastLessonsSeen = [];
+
         private readonly CalendarOptions options = options.Value;
 
         public async Task RunAsync(ITask currentTask, IServiceProvider scopeServiceProvider, CancellationToken cancellationToken)
@@ -33,7 +35,14 @@ namespace SchoolHelper
                 if (cls.Lessons.Count == 0)
                 {
                     logger.LogWarning("Found 0 lessons for {ClassName}, will re-run shortly", cls.ClassName);
-                    currentTask.Options.Interval = TimeSpan.FromMinutes(1);
+                    var minutesSinceLastSeen = DateTimeOffset.UtcNow.Subtract(LastLessonsSeen.GetValueOrDefault(cls.ClassUnitId, DateTimeOffset.MinValue)).TotalMinutes;
+                    currentTask.Options.Interval = minutesSinceLastSeen switch
+                    {
+                        <= 3 => TimeSpan.FromMinutes(1),
+                        <= 15 => TimeSpan.FromMinutes(3),
+                        <= 40 => TimeSpan.FromMinutes(10),
+                        _ => Interval,
+                    };
                 }
                 else
                 {
@@ -43,6 +52,7 @@ namespace SchoolHelper
 
                     await storageService.Upload(fileName.ToLowerInvariant(), ms);
 
+                    LastLessonsSeen[cls.ClassUnitId] = DateTimeOffset.UtcNow;
                     logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
                 }
             }

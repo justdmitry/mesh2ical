@@ -74,7 +74,7 @@ namespace SchoolHelper.Mesh
             {
                 throw new InvalidOperationException("No token configured");
             }
-            else if (GetTokenExpiration(oldToken) > DateTimeOffset.UtcNow.AddDays(1))
+            else if (GetTokenExpiration(oldToken) > DateTimeOffset.UtcNow.AddHours(7))
             {
                 logger.LogDebug("Token is fresh enough, no need to update.");
                 return oldToken;
