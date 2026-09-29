@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>SchoolHelper</RootNamespace>
-    <Version>2.1.5</Version>
+    <Version>2.2.1</Version>
   </PropertyGroup>
 
   <PropertyGroup>

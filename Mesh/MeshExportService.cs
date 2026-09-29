@@ -11,42 +11,112 @@ namespace SchoolHelper.Mesh
     {
         protected static readonly TimeSpan MaxTokenLifetime = TimeSpan.FromMinutes(20);
 
-        public async IAsyncEnumerable<ClassInfo> GetClasses(bool skipAdditionalSources)
+        public async Task<Child[]> GetFamily()
         {
             var token = await GetToken();
 
-            var family = await GetFamily(token);
+            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/family/web/v1/profile");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
 
-            logger.LogInformation("Got family with {Count} children", family.children.Length);
+            var resp = await httpClient.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
 
-            foreach (var child in family.children.Where(x => !string.IsNullOrEmpty(x.contingent_guid)))
+            var family = await resp.Content.ReadFromJsonAsync<ProfileResponse>();
+
+            logger.LogInformation("Got family with {Count} children", family?.children.Length);
+
+            return family?.children ?? [];
+        }
+
+        public async Task<List<Lesson>> GetClasses(string personId, bool skipAdditionalSources)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(personId);
+
+            var token = await GetToken();
+
+            var dateStart = DateTimeOffset.Now.AddDays(-7).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var dateEnd = DateTimeOffset.Now.AddDays(14).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/eventcalendar/v1/api/events?person_ids={personId}&begin_date={dateStart}&end_date={dateEnd}&expand=homework");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
+            req.Headers.TryAddWithoutValidation("X-Mes-Role", "parent");
+
+            var resp = await httpClient.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+
+            var events = await resp.Content.ReadFromJsonAsync<EventsResponse>();
+
+            if (events?.errors != null)
             {
-                var events = await GetEvents(child.contingent_guid!, token);
-                var list = events.response?
-                    .Where(x => !skipAdditionalSources || x.source == EventsResponse.SourcePlanEx || x.source == EventsResponse.SourceOutOfPlanEx)
-                    .Select(x => new Lesson()
-                    {
-                        Id = x.id,
-                        Start = x.start_at,
-                        End = x.finish_at,
-                        Name = x.subject_name,
-                        Location = x.room_number,
-                        Homework = x.homework?.descriptions,
-                        Replaced = x.replaced,
-                    })
-                    .ToList();
-                var cls = new ClassInfo
+                foreach (var err in events.errors.SelectMany(x => x.Value.Select(v => v.error_description)))
                 {
-                    SchoolNameShort = child.school?.short_name ?? "???",
-                    SchoolNameFull = child.school?.name ?? "???",
-                    ClassUnitId = child.class_unit_id,
-                    ClassLevel = child.class_level_id,
-                    ClassName = child.class_name ?? child.class_level_id.ToString(),
-                    Lessons = list ?? [],
-                };
-
-                yield return cls;
+                    logger.LogWarning("Error: {Text}", err);
+                }
             }
+
+            return events?.response?
+                .Where(x => !skipAdditionalSources || x.source == EventsResponse.SourcePlanEx || x.source == EventsResponse.SourceOutOfPlanEx)
+                .Select(x => new Lesson()
+                {
+                    Id = x.id,
+                    Start = x.start_at,
+                    End = x.finish_at,
+                    Name = x.subject_name,
+                    Location = x.room_number,
+                    Homework = x.homework?.descriptions,
+                    Replaced = x.replaced,
+                })
+                .ToList() ?? [];
+        }
+
+        public async Task<(long? ContractId, decimal? Balance)> GetBalance(string personId)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(personId);
+
+            var token = await GetToken();
+
+            var param = Uri.EscapeDataString($"[{{\"personId\":\"{personId}\"}}]");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/food/meals/v3/clients/balance?clientIds={param}");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
+            req.Headers.TryAddWithoutValidation("X-Mes-RoleId", "2");
+
+            var resp = await httpClient.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+
+            var balances = await resp.Content.ReadFromJsonAsync<List<MealsBalanceResponseItem>>();
+            var balance = balances?.FirstOrDefault();
+            var contractId = balance?.contractId;
+            var sum = balance?.balance / 100.00M;
+
+            logger.LogInformation("Got {Count} balances for {PersonId}/{ContractId}, first is {Sum}", balances?.Count, balance?.clientId.personId, contractId, sum);
+
+            return (contractId, sum);
+        }
+
+        public async Task<(decimal? OrderSum3Days, decimal? OrderSum14Days)> GetPreorderSummary(string personId)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(personId);
+
+            var token = await GetToken();
+
+            var param = Uri.EscapeDataString($"{{\"personId\":\"{personId}\"}}");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/food/meals/v3/orders/preorder/summary?clientId={param}");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
+            req.Headers.TryAddWithoutValidation("X-Mes-RoleId", "2");
+
+            var resp = await httpClient.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+
+            var obj = await resp.Content.ReadFromJsonAsync<MealsPreorderSummaryResponse>();
+            var sum3 = obj?.orderSum3Days / 100.00M;
+            var sum14 = obj?.orderSum14Days / 100.00M;
+
+            logger.LogInformation("Got preorder summary for {PersonId}: {Sum1} for 3 days, {Sum2} for 14 days", personId, sum3, sum14);
+
+            return (sum3, sum14);
         }
 
         public async IAsyncEnumerable<MealInfo> GetMeals(int contractId, DateOnly date)
@@ -108,44 +178,7 @@ namespace SchoolHelper.Mesh
             return newToken.access_token;
         }
 
-        protected async Task<ProfileResponse> GetFamily(string token)
-        {
-            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/family/web/v1/profile");
-            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
-
-            var resp = await httpClient.SendAsync(req);
-            resp.EnsureSuccessStatusCode();
-
-            return (await resp.Content.ReadFromJsonAsync<ProfileResponse>())!;
-        }
-
-        protected async Task<EventsResponse> GetEvents(string childId, string token)
-        {
-            var dateStart = DateTimeOffset.Now.AddDays(-7).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var dateEnd = DateTimeOffset.Now.AddDays(14).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/eventcalendar/v1/api/events?person_ids={childId}&begin_date={dateStart}&end_date={dateEnd}&expand=homework");
-            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
-            req.Headers.TryAddWithoutValidation("X-Mes-Role", "parent");
-
-            var resp = await httpClient.SendAsync(req);
-            resp.EnsureSuccessStatusCode();
-
-            var obj = (await resp.Content.ReadFromJsonAsync<EventsResponse>())!;
-
-            if (obj.errors != null)
-            {
-                foreach (var err in obj.errors.SelectMany(x => x.Value.Select(v => v.error_description)))
-                {
-                    logger.LogWarning("Error: {Text}", err);
-                }
-            }
-
-            return obj;
-        }
-
-        protected async Task<List<MealsOrdersReaponseItem>> GetMeals(int contractId, DateOnly date, string token)
+        protected async Task<List<MealsOrdersResponseItem>> GetMeals(int contractId, DateOnly date, string token)
         {
             var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/meals/v2/orders?contractId={contractId}&from={date:yyyy-MM-dd}T00:00:01&to={date:yyyy-MM-dd}T23:59:00");
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -154,7 +187,7 @@ namespace SchoolHelper.Mesh
             var resp = await httpClient.SendAsync(req);
             resp.EnsureSuccessStatusCode();
 
-            return (await resp.Content.ReadFromJsonAsync<List<MealsOrdersReaponseItem>>())!;
+            return (await resp.Content.ReadFromJsonAsync<List<MealsOrdersResponseItem>>())!;
         }
 
         private static DateTimeOffset GetTokenExpiration(string token)

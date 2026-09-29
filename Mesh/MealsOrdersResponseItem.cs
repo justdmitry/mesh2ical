@@ -1,6 +1,6 @@
 ﻿namespace SchoolHelper.Mesh
 {
-    public class MealsOrdersReaponseItem
+    public class MealsOrdersResponseItem
     {
         public long id { get; set; }
         //public DateTimeOffset createdAt { get; set; }

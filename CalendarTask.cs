@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RecurrentTasks;
@@ -30,12 +31,17 @@ namespace SchoolHelper
                 return;
             }
 
-            await foreach (var cls in meshService.GetClasses(options.SkipAdditionalSources))
+            var children = await meshService.GetFamily();
+
+            foreach (var child in children.Where(x => !string.IsNullOrEmpty(x.contingent_guid)))
             {
-                if (cls.Lessons.Count == 0)
+                var personId = child.contingent_guid!;
+                var lessons = await meshService.GetClasses(personId, options.SkipAdditionalSources);
+
+                if (lessons.Count == 0)
                 {
-                    logger.LogWarning("Found 0 lessons for {ClassName}, will re-run shortly", cls.ClassName);
-                    var minutesSinceLastSeen = DateTimeOffset.UtcNow.Subtract(LastLessonsSeen.GetValueOrDefault(cls.ClassUnitId, DateTimeOffset.MinValue)).TotalMinutes;
+                    logger.LogWarning("Found 0 lessons for {ClassName}, will re-run shortly", child.class_name);
+                    var minutesSinceLastSeen = DateTimeOffset.UtcNow.Subtract(LastLessonsSeen.GetValueOrDefault(child.class_unit_id, DateTimeOffset.MinValue)).TotalMinutes;
                     currentTask.Options.Interval = minutesSinceLastSeen switch
                     {
                         <= 3 => TimeSpan.FromMinutes(1),
@@ -43,18 +49,54 @@ namespace SchoolHelper
                         <= 40 => TimeSpan.FromMinutes(10),
                         _ => Interval,
                     };
+
+                    continue;
                 }
-                else
+
+                var cls = new ClassInfo
                 {
-                    using var ms = GenerateIcal(cls);
+                    SchoolNameShort = child.school?.short_name ?? "???",
+                    SchoolNameFull = child.school?.name ?? "???",
+                    ClassUnitId = child.class_unit_id,
+                    ClassLevel = child.class_level_id,
+                    ClassName = child.class_name ?? child.class_level_id.ToString(),
+                    Lessons = lessons,
+                };
 
-                    var fileName = $"class{cls.ClassUnitId}.ics";
+                using var ms = GenerateIcal(cls);
 
-                    await storageService.Upload(fileName.ToLowerInvariant(), ms);
+                var fileName = $"class{cls.ClassUnitId}.ics";
 
-                    LastLessonsSeen[cls.ClassUnitId] = DateTimeOffset.UtcNow;
-                    logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
-                }
+                await storageService.Upload(fileName.ToLowerInvariant(), ms);
+
+                LastLessonsSeen[cls.ClassUnitId] = DateTimeOffset.UtcNow;
+                logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
+            }
+
+            foreach (var child in children.Where(x => !string.IsNullOrEmpty(x.contingent_guid)))
+            {
+                var personId = child.contingent_guid!;
+                var (contractId, bal) = await meshService.GetBalance(personId);
+                var (sum3, sum14) = await meshService.GetPreorderSummary(personId);
+
+                var balance = new
+                {
+                    Balance = bal,
+                    PreorderSum3Days = sum3,
+                    PreorderSum14Days = sum14,
+                    BalanceAfter3Days = (bal - sum3),
+                    BalanceAfter14Days = (bal - sum14),
+                };
+
+                using var ms = new MemoryStream();
+                await JsonSerializer.SerializeAsync(ms, balance);
+                ms.Position = 0;
+
+                var fileName = $"balance{personId}-{contractId}.json";
+
+                await storageService.Upload(fileName.ToLowerInvariant(), ms);
+
+                logger.LogInformation("Saved balance of {PersonId} into {File}", personId, fileName);
             }
         }
 
