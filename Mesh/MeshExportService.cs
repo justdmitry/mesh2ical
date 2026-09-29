@@ -123,7 +123,7 @@ namespace SchoolHelper.Mesh
         {
             var token = await GetToken();
 
-            var meals = await GetMeals(contractId, date, token);
+            var meals = await GetMealsV2(contractId, date, token);
             foreach (var complex in meals.SelectMany(x => x.items).Where(x => x.complex != null).Select(x => x.complex))
             {
                 yield return new MealInfo
@@ -132,6 +132,50 @@ namespace SchoolHelper.Mesh
                     Content = string.Join(Environment.NewLine, complex.items.Select(x => x.name)),
                 };
             }
+        }
+
+        public async Task<(decimal Preordered, decimal Purchased, decimal Other)> GetMealsSummary(string personId, DateOnly date)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(personId);
+
+            var token = await GetToken();
+
+            var param = Uri.EscapeDataString($"{{\"personId\":\"{personId}\"}}");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/food/meals/v3/orders?clientId={param}&from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}&limit=50");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            req.Headers.TryAddWithoutValidation("X-mes-subsystem", "familyweb");
+            req.Headers.TryAddWithoutValidation("X-Mes-RoleId", "2");
+
+            var resp = await httpClient.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+
+            var meals = await resp.Content.ReadFromJsonAsync<MealsV3OrdersResponseItem>();
+
+            var totals = meals.orders
+                .Aggregate<MealsV3OrdersResponseItem.Order, (decimal, decimal, decimal)>(
+                    (0, 0, 0),
+                    (x, y) =>
+                    {
+                        switch (y.orderType)
+                        {
+                            case 3:
+                                x.Item1 += y.totalPrice / 100.00M;
+                                break;
+
+                            case 2:
+                                x.Item2 += y.totalPrice / 100.00M;
+                                break;
+
+                            default:
+                                x.Item3 += y.totalPrice / 100.00M;
+                                break;
+                        }
+                        return x;
+                    });
+
+            logger.LogInformation("Got meals summary for {PersonId}/{Date}: {Sum1} for preorders, {Sum2} for purchased, {Sum3} for other.", personId, date, totals.Item1, totals.Item2, totals.Item3);
+
+            return totals;
         }
 
         protected async Task<string> GetToken()
@@ -178,7 +222,7 @@ namespace SchoolHelper.Mesh
             return newToken.access_token;
         }
 
-        protected async Task<List<MealsOrdersResponseItem>> GetMeals(int contractId, DateOnly date, string token)
+        protected async Task<List<MealsV2OrdersResponseItem>> GetMealsV2(int contractId, DateOnly date, string token)
         {
             var req = new HttpRequestMessage(HttpMethod.Get, $"https://school.mos.ru/api/meals/v2/orders?contractId={contractId}&from={date:yyyy-MM-dd}T00:00:01&to={date:yyyy-MM-dd}T23:59:00");
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -187,7 +231,7 @@ namespace SchoolHelper.Mesh
             var resp = await httpClient.SendAsync(req);
             resp.EnsureSuccessStatusCode();
 
-            return (await resp.Content.ReadFromJsonAsync<List<MealsOrdersResponseItem>>())!;
+            return (await resp.Content.ReadFromJsonAsync<List<MealsV2OrdersResponseItem>>())!;
         }
 
         private static DateTimeOffset GetTokenExpiration(string token)

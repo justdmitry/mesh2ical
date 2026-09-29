@@ -18,6 +18,8 @@ namespace SchoolHelper
 
         private static readonly Dictionary<int, DateTimeOffset> LastLessonsSeen = [];
 
+        private static readonly TimeSpan TimeOffset = TimeSpan.FromHours(3);
+
         private readonly CalendarOptions options = options.Value;
 
         public async Task RunAsync(ITask currentTask, IServiceProvider scopeServiceProvider, CancellationToken cancellationToken)
@@ -67,7 +69,7 @@ namespace SchoolHelper
 
                 var fileName = $"class{cls.ClassUnitId}.ics";
 
-                await storageService.Upload(fileName.ToLowerInvariant(), ms);
+                await storageService.Upload(fileName.ToLowerInvariant(), ms, "text/calendar; charset=utf-8");
 
                 LastLessonsSeen[cls.ClassUnitId] = DateTimeOffset.UtcNow;
                 logger.LogInformation("Saved {Count} lessons of {Class} into {File}", cls.Lessons.Count, cls.ClassName, fileName);
@@ -79,6 +81,9 @@ namespace SchoolHelper
                 var (contractId, bal) = await meshService.GetBalance(personId);
                 var (sum3, sum14) = await meshService.GetPreorderSummary(personId);
 
+                var date = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeOffset).DateTime);
+                var (preordered, purchased, other) = await meshService.GetMealsSummary(personId, date);
+
                 var balance = new
                 {
                     Balance = bal,
@@ -86,6 +91,10 @@ namespace SchoolHelper
                     PreorderSum14Days = sum14,
                     BalanceAfter3Days = (bal - sum3),
                     BalanceAfter14Days = (bal - sum14),
+                    MealsPreordered = preordered,
+                    MealsPurchased = purchased,
+                    MealsOther = other,
+                    MealsDate = date,
                 };
 
                 using var ms = new MemoryStream();
@@ -94,7 +103,7 @@ namespace SchoolHelper
 
                 var fileName = $"balance{personId}-{contractId}.json";
 
-                await storageService.Upload(fileName.ToLowerInvariant(), ms);
+                await storageService.Upload(fileName.ToLowerInvariant(), ms, "application/json");
 
                 logger.LogInformation("Saved balance of {PersonId} into {File}", personId, fileName);
             }

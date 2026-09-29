@@ -6,11 +6,11 @@ using Microsoft.Extensions.Options;
 
 namespace SchoolHelper.Yandex
 {
-    public class StorageService (ILogger<StorageService> logger, IOptionsSnapshot<StorageOptions> options)
+    public class StorageService(ILogger<StorageService> logger, IOptionsSnapshot<StorageOptions> options)
     {
         private readonly StorageOptions options = options.Value;
 
-        public async Task Upload(string fileName, MemoryStream data)
+        public async Task Upload(string fileName, MemoryStream data, string contentType)
         {
             var awsCredentials = new BasicAWSCredentials(options.KeyId, options.KeySecret);
             var awsConfig = new AmazonS3Config
@@ -28,7 +28,7 @@ namespace SchoolHelper.Yandex
                 InputStream = data,
             };
 
-            req.Headers.ContentType = "text/calendar; charset=utf-8";
+            req.Headers.ContentType = contentType;
             req.Headers.CacheControl = "public, max-age=3600"; // 1 hour
             req.Headers.Expires = DateTime.UtcNow.AddHours(1);
 
